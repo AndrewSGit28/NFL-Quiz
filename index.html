@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NFL Trivia Quiz</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<style>
+body { font-family: 'Inter', sans-serif; background-color: #1a202c; color: #e2e8f0; }
+.container { max-width: 800px; margin: auto; padding: 20px; }
+.question-card, .result-card { background-color: #2d3748; border-radius: 1rem; padding: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);}
+.option-button { transition: all 0.2s; margin: 5px; padding: 10px; border-radius: 8px; background-color:#4a5568; color:#e2e8f0; font-weight:bold; width:100%;}
+.option-button:hover { background-color: #ecc94b; color: #1a202c;}
+.correct { background-color: #38a169 !important;}
+.incorrect { background-color: #e53e3e !important;}
+.progress-bar-container { background-color: #4a5568; border-radius: 1rem; overflow: hidden; height: 20px; margin-bottom: 1rem;}
+.progress-bar { height:100%; width:0%; background-color: #ecc94b; transition: width 0.3s;}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1 class="text-4xl text-yellow-300 font-bold text-center mb-6">🏈 NFL Trivia Quiz 🏈</h1>
+
+  <!-- Start Screen -->
+  <div id="start-screen" class="question-card text-center">
+    <input id="player-name-input" placeholder="Your Name" class="mb-4 p-2 rounded bg-gray-700 text-white w-full"/>
+    <button id="start-button" class="w-full p-2 bg-yellow-400 font-bold rounded" disabled>Start Quiz</button>
+    <button id="view-leaderboard-button" class="w-full p-2 mt-2 bg-gray-600 font-bold rounded">View Leaderboard</button>
+  </div>
+
+  <!-- Quiz Container -->
+  <div id="quiz-container" class="question-card hidden">
+    <div class="progress-bar-container mb-4">
+      <div id="progress-bar" class="progress-bar"></div>
+    </div>
+    <p id="question-text" class="text-lg font-bold mb-4"></p>
+    <div id="options-container" class="grid grid-cols-1 gap-2"></div>
+    <div id="feedback" class="mt-2 font-bold text-center"></div>
+  </div>
+
+  <!-- Result Area -->
+  <div id="result-area" class="hidden text-center question-card">
+    <h2 class="text-3xl font-bold mb-4">Quiz Complete!</h2>
+    <p id="final-score" class="text-2xl font-semibold mb-6"></p>
+    <button id="restart-button" class="mt-4 px-6 py-2 bg-yellow-400 font-bold rounded">Restart Quiz</button>
+  </div>
+
+  <!-- Leaderboard -->
+  <div id="leaderboard-area" class="hidden question-card text-center">
+    <h2 class="text-3xl font-bold text-center mb-4">Leaderboard</h2>
+    <ul id="leaderboard-list" class="mb-4"></ul>
+    <button id="back-to-quiz-button" class="mt-2 px-6 py-2 bg-yellow-400 font-bold rounded">Back to Quiz</button>
+  </div>
+</div>
+
+<script>
+// Replace with your Google Sheets Web App URL
+const SHEETS_API = "https://script.google.com/macros/s/AKfycbyIXSByDJY_8yOgQDdW1A5xuptVsr_FKOcdSXroBSRj-rafBzPkh6HfoDPnWA0RNkzl/exec";
+
+// Quiz Data (40 Questions)
+const quizData = [
+  { question: "What does NFL stand for?", options: ["National Football League", "National Field League", "New Football Leaders", "New Field Lines"], answer: "National Football League" },
+  { question: "How many teams are in the NFL?", options: ["20", "32", "16", "50"], answer: "32" },
+  { question: "How many points is a touchdown worth?", options: ["3", "6", "7", "1"], answer: "6" },
+  { question: "What is the big game at the end of the season called?", options: ["The Bowl Game", "The Championship Bowl", "The Super Bowl", "The Final Four"], answer: "The Super Bowl" },
+  { question: "What is the shape of a football?", options: ["Round", "Square", "Oval", "Triangle"], answer: "Oval" },
+  { question: "How many chances (downs) does a team have to go 10 yards?", options: ["2", "3", "4", "5"], answer: "4" },
+  { question: "What is the person who throws the ball called?", options: ["Linebacker", "Quarterback", "Receiver", "Coach"], answer: "Quarterback" },
+  { question: "What do referees throw on the field when there is a penalty?", options: ["A white flag", "A red flag", "A yellow flag", "A whistle"], answer: "A yellow flag" },
+  { question: "What are the two big conferences in the NFL called?", options: ["AFC & NFC", "East & West", "North & South", "Big 10 & SEC"], answer: "AFC & NFC" },
+  { question: "What is it called when a player catches a pass in the end zone for a score?", options: ["A goal", "A safety", "A field goal", "A touchdown"], answer: "A touchdown" },
+  { question: "Which team has a pirate for a mascot?", options: ["Minnesota Vikings", "Tampa Bay Buccaneers", "New Orleans Saints", "Atlanta Falcons"], answer: "Tampa Bay Buccaneers" },
+  { question: "Which NFC East team's fans are known for their signature 'E-A-G-L-E-S' chant?", options: ["The Team from Dallas", "The Team from Philadelphia", "The Team from New York", "The Team from Washington"], answer: "The Team from Philadelphia" },
+  { question: "The Green Bay Packers are famous for their fans wearing something on their heads that looks like a food. What is it?", options: ["A hot dog", "A cheesehead", "A hamburger", "A taco"], answer: "A cheesehead" },
+  { question: "Which team known for its star logo is also called 'America's Team'?", options: ["Broncos", "Cowboys", "Texans", "Giants"], answer: "Cowboys" },
+  { question: "The New England Patriots' mascot is a person from what historical American event?", options: ["The American Revolution", "The Gold Rush", "The Civil War", "World War II"], answer: "The American Revolution" },
+  { question: "Which team has a horse mascot named Blue?", options: ["Denver Broncos", "Indianapolis Colts", "Buffalo Bills", "New York Giants"], answer: "Indianapolis Colts" },
+  { question: "Which NFL team's name is inspired by seafaring Scandinavian warriors?", options: ["New Orleans Saints", "Minnesota Vikings", "Tampa Bay Buccaneers", "New York Giants"], answer: "Minnesota Vikings" },
+  { question: "Which team has a big red bird as its mascot?", options: ["Atlanta Falcons", "Baltimore Ravens", "Arizona Cardinals", "Seattle Seahawks"], answer: "Arizona Cardinals" },
+  { question: "What star wide receiver for the Minnesota Vikings popularized a celebratory touchdown dance called 'The Griddy'?", options: ["Justin Jefferson", "Ja'Marr Chase", "Odell Beckham Jr.", "Tyreek Hill"], answer: "Justin Jefferson" },
+  { question: "Which two teams play in the state of Florida?", options: ["Dolphins & Buccaneers", "Jaguars & Dolphins", "Buccaneers & Jaguars", "All of the above"], answer: "All of the above" },
+  { question: "What famous quarterback is known for winning seven Super Bowls?", options: ["Peyton Manning", "Joe Montana", "Tom Brady", "Drew Brees"], answer: "Tom Brady" },
+  { question: "What retired running back holds the record for the most rushing yards in a career?", options: ["Adrian Peterson", "Emmitt Smith", "Walter Payton", "Barry Sanders"], answer: "Emmitt Smith" },
+  { question: "What team won the very first Super Bowl?", options: ["Green Bay Packers", "Kansas City Chiefs", "New York Jets", "Dallas Cowboys"], answer: "Green Bay Packers" },
+  { question: "What is the name of the trophy given to the Super Bowl winner?", options: ["The Heisman Trophy", "The MVP Award", "The Lombardi Trophy", "The Stanley Cup"], answer: "The Lombardi Trophy" },
+  { question: "What quarterback was nicknamed 'Joe Cool' and won four Super Bowls with the San Francisco 49ers?", options: ["Joe Namath", "Joe Burrow", "Joe Montana", "Joe Theismann"], answer: "Joe Montana" },
+  { question: "Which legendary wide receiver holds the record for the most touchdowns in a career?", options: ["Jerry Rice", "Randy Moss", "Larry Fitzgerald", "Calvin Johnson"], answer: "Jerry Rice" },
+  { question: "The famous 'Lambeau Leap' where players jump into the stands after a touchdown is a tradition for what team?", options: ["Green Bay Packers", "Dallas Cowboys", "New England Patriots", "Pittsburgh Steelers"], answer: "Green Bay Packers" },
+  { question: "What quarterback is famous for playing for both the Indianapolis Colts and the Denver Broncos?", options: ["Tom Brady", "Peyton Manning", "Drew Brees", "Aaron Rodgers"], answer: "Peyton Manning" },
+  { question: "Who is the only athlete to be named an All-Star in both football and baseball?", options: ["Deion Sanders", "Bo Jackson", "Tim Tebow", "Jim Brown"], answer: "Bo Jackson" },
+  { question: "The all-time leading passer, who also won a Super Bowl with the Tampa Bay Buccaneers, is named...", options: ["Tom Brady", "Drew Brees", "Peyton Manning", "Brett Favre"], answer: "Tom Brady" },
+  { question: "True or False: The first footballs were made from pig bladders.", options: ["True", "False"], answer: "True" },
+  { question: "The field is ___ yards long.", options: ["50", "100", "120", "150"], answer: "100" },
+  { question: "True or False: The Super Bowl is the most-watched sporting event in the United States.", options: ["True", "False"], answer: "True" },
+  { question: "A field goal is worth ___ points.", options: ["1", "2", "3", "6"], answer: "3" },
+  { question: "The game of football has four ___ that are 15 minutes each.", options: ["Halves", "Periods", "Quarters", "Rounds"], answer: "Quarters" },
+  { question: "True or False: The New Orleans Saints' mascot is a dog named Gumbo.", options: ["True", "False"], answer: "True" },
+  { question: "A team gets a safety, which is worth ___ points, when they tackle an opponent in their own end zone.", options: ["1", "2", "3", "4"], answer: "2" },
+  { question: "True or False: Helmets have always been required in the NFL.", options: ["True", "False"], answer: "False" },
+  { question: "The only NFL team to have a perfect undefeated season is the ___ Dolphins.", options: ["New Orleans", "Miami", "Jacksonville", "Tampa Bay"], answer: "Miami" },
+  { question: "The NFL was founded in what year?", options: ["1920", "1950", "1967", "1980"], answer: "1920" }
+];
+
+// DOM Elements
+const startScreen = document.getElementById("start-screen");
+const quizContainer = document.getElementById("quiz-container");
+const questionText = document.getElementById("question-text");
+const optionsContainer = document.getElementById("options-container");
+const feedback = document.getElementById("feedback");
+const progressBar = document.getElementById("progress-bar");
+const finalScore = document.getElementById("final-score");
+const resultArea = document.getElementById("result-area");
+const restartButton = document.getElementById("restart-button");
+const playerNameInput = document.getElementById("player-name-input");
+const startButton = document.getElementById("start-button");
+const viewLeaderboardButton = document.getElementById("view-leaderboard-button");
+const leaderboardArea = document.getElementById("leaderboard-area");
+const leaderboardList = document.getElementById("leaderboard-list");
+const backToQuizButton = document.getElementById("back-to-quiz-button");
+
+let currentQuestion = 0;
+let score = 0;
+let playerName = "";
+
+// Utility
+function show(el) { el.classList.remove("hidden"); }
+function hide(el) { el.classList.add("hidden"); }
+function updateProgress() { progressBar.style.width = ((currentQuestion)/quizData.length*100) + "%"; }
+function validateName(name){ return name && name.trim().length >=2; }
+function resetQuiz(){ currentQuestion=0; score=0; updateProgress(); feedback.textContent=""; }
+
+// Load Question
+function loadQuestion(){
+  feedback.textContent="";
+  const q = quizData[currentQuestion];
+  questionText.textContent = q.question;
+  optionsContainer.innerHTML="";
+  q.options.forEach(opt=>{
+    const btn = document.createElement("button");
+    btn.className="option-button";
+    btn.textContent = opt;
+    btn.onclick=()=> selectOption(opt);
+    optionsContainer.appendChild(btn);
+  });
+  updateProgress();
+}
+
+// Select Option
+function selectOption(selected){
+  const q = quizData[currentQuestion];
+  Array.from(optionsContainer.children).forEach(btn=>{
+    btn.disabled=true;
+    if(btn.textContent === q.answer) btn.classList.add("correct");
+    if(btn.textContent === selected && selected !== q.answer) btn.classList.add("incorrect");
+  });
+  if(selected === q.answer){
+    feedback.textContent="Correct!";
+    feedback.style.color="#48bb78";
+    score++;
+  }else{
+    feedback.textContent="Incorrect!";
+    feedback.style.color="#f56565";
+  }
+  setTimeout(()=>{
+    currentQuestion++;
+    if(currentQuestion < quizData.length) loadQuestion();
+    else finishQuiz();
+  }, 900);
+}
+
+// Finish Quiz
+function finishQuiz(){
+  hide(quizContainer);
+  show(resultArea);
+  finalScore.textContent=`${playerName}, you scored ${score} out of ${quizData.length}!`;
+  // Confetti
+  confetti({ particleCount: 150, spread: 70, origin: {y:0.6} });
+  // Save score to Google Sheets
+  if(validateName(playerName)){
+    fetch(SHEETS_API, {method:"POST", headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:playerName, score:score})});
+  }
+}
+
+// Event Listeners
+playerNameInput.addEventListener("input", ()=>{ startButton.disabled = !validateName(playerNameInput.value); });
+startButton.addEventListener("click", ()=>{
+  playerName=playerNameInput.value.trim();
+  resetQuiz();
+  hide(startScreen); hide(resultArea); hide(leaderboardArea); show(quizContainer);
+  loadQuestion();
+});
+restartButton.addEventListener("click", ()=>{ hide(resultArea); show(startScreen); });
+viewLeaderboardButton.addEventListener("click", showLeaderboard);
+backToQuizButton.addEventListener("click", ()=>{ hide(leaderboardArea); show(startScreen); });
+
+// Leaderboard
+function showLeaderboard(){
+  leaderboardList.innerHTML="<li>Loading...</li>";
+  hide(startScreen); hide(quizContainer); hide(resultArea); show(leaderboardArea);
+  fetch(SHEETS_API).then(res=>res.json()).then(data=>{
+    leaderboardList.innerHTML="";
+    data.sort((a,b)=>b.score-a.score).forEach((item,i)=>{
+      const li=document.createElement("li");
+      li.innerHTML=`<span class="font-bold text-yellow-300">#${i+1}:</span> ${item.name} - <span class="font-bold text-green-300">${item.score}</span>`;
+      leaderboardList.appendChild(li);
+    });
+  }).catch(()=>{ leaderboardList.innerHTML="<li>Error loading leaderboard</li>"; });
+}
+</script>
+</body>
+</html>
